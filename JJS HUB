@@ -1,20 +1,5 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
--- Define missing variables/functions at the top
-local IsOnMobile = game:GetService("UserInputService").TouchEnabled
-
-local function NOFLY()
-    if FLYING then
-        unmobilefly(game:GetService("Players").LocalPlayer)
-    end
-end
-
-local function sFLY()
-    if not FLYING then
-        mobilefly(game:GetService("Players").LocalPlayer)
-    end
-end
-
 local Window = Rayfield:CreateWindow({
     Name = "JJS Hub",
     Icon = 0,
@@ -45,37 +30,25 @@ local Window = Rayfield:CreateWindow({
     }
 })
 
--- Animation IDs
-local ANIMATIONS = {
-    Forward = 282574440,
-    Backward = 9443517965,
-    Left = 9443520855,
-    Right = 9443521999,
-    Idle = 616158929
-}
+local IsOnMobile = game:GetService("UserInputService").TouchEnabled
+local player = game:GetService("Players").LocalPlayer
 
--- Globals
+-- Fly system variables
 local mfly1, mfly2
 local FLYING = false
 local velocityHandlerName = "MobileVelocity"
 local gyroHandlerName = "MobileGyro"
-local iyflyspeed = 1
-local vehicleflyspeed = 1
+local iyflyspeed = 50
+local vehicleflyspeed = 50
 
--- Helpers
+-- Store toggle reference globally
+local FlyToggle = nil
+
+-- Helper functions
 local function getRoot(char)
     return char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso") or char:FindFirstChild("UpperTorso"))
 end
 
-local function loadAnimation(char, id)
-    local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-    if not humanoid then return nil end
-    local anim = Instance.new("Animation")
-    anim.AnimationId = "rbxassetid://"..id
-    return humanoid:LoadAnimation(anim)
-end
-
--- Disconnect with nil check
 local function safeDisconnect(conn)
     if conn then
         pcall(function() conn:Disconnect() end)
@@ -84,40 +57,12 @@ local function safeDisconnect(conn)
     return conn
 end
 
--- Stop all anims
-local animTracks = {}
-local function stopAllAnims()
-    for k, v in pairs(animTracks) do
-        if v then
-            v:Stop()
-        end
-    end
-    animTracks = {}
-end
-
--- Update animation based on move vector
-local function updateMobileAnimation(char, dir)
-    stopAllAnims()
-
-    local animName = "Idle"
-    if math.abs(dir.X) > math.abs(dir.Z) then
-        animName = dir.X > 0 and "Right" or "Left"
-    elseif math.abs(dir.Z) > 0 then
-        animName = dir.Z < 0 and "Forward" or "Backward"
-    end
-
-    local track = loadAnimation(char, ANIMATIONS[animName])
-    if track then
-        track:Play()
-        track.Looped = true
-        animTracks[animName] = track
-    end
-end
-
--- Stop flying
-local function unmobilefly(speaker)
+-- Stop flying function
+local function NOFLY()
+    if not FLYING then return end
+    
     FLYING = false
-    local char = speaker.Character
+    local char = player.Character
     if char then
         local root = getRoot(char)
         if root then
@@ -133,26 +78,26 @@ local function unmobilefly(speaker)
 
     mfly1 = safeDisconnect(mfly1)
     mfly2 = safeDisconnect(mfly2)
-    stopAllAnims()
 end
 
--- Start flying
-local function mobilefly(speaker, vfly)
-    unmobilefly(speaker)
+-- Start flying function
+local function sFLY()
+    if FLYING then return end
+    
     FLYING = true
-
-    local char = speaker.Character
+    local char = player.Character
+    if not char then return end
+    
     local root = getRoot(char)
+    if not root then return end
+    
     local camera = workspace.CurrentCamera
     local v3inf = Vector3.new(9e9, 9e9, 9e9)
-    local v3none = Vector3.zero
-
-    local controlModule = require(speaker.PlayerScripts:WaitForChild("PlayerModule"):WaitForChild("ControlModule"))
-
+    
     -- Create velocity + gyro
     local bv = Instance.new("BodyVelocity")
     bv.Name = velocityHandlerName
-    bv.MaxForce = Vector3.zero
+    bv.MaxForce = v3inf
     bv.Velocity = Vector3.zero
     bv.Parent = root
 
@@ -164,18 +109,20 @@ local function mobilefly(speaker, vfly)
     bg.Parent = root
 
     -- Reapply on respawn
-    mfly1 = speaker.CharacterAdded:Connect(function(newChar)
+    mfly1 = player.CharacterAdded:Connect(function(newChar)
         task.wait(1)
+        if not FLYING then return end
+        
         local newRoot = getRoot(newChar)
         if not newRoot then return end
 
-        local newBV = Instance.new("BodyVelocity")
+        local newBV = newRoot:FindFirstChild(velocityHandlerName) or Instance.new("BodyVelocity")
         newBV.Name = velocityHandlerName
-        newBV.MaxForce = Vector3.zero
+        newBV.MaxForce = v3inf
         newBV.Velocity = Vector3.zero
         newBV.Parent = newRoot
 
-        local newBG = Instance.new("BodyGyro")
+        local newBG = newRoot:FindFirstChild(gyroHandlerName) or Instance.new("BodyGyro")
         newBG.Name = gyroHandlerName
         newBG.MaxTorque = v3inf
         newBG.P = 1000
@@ -185,30 +132,20 @@ local function mobilefly(speaker, vfly)
 
     -- Update each frame
     mfly2 = game:GetService("RunService").RenderStepped:Connect(function()
-        char = speaker.Character
+        if not FLYING then return end
+        
+        char = player.Character
+        if not char then return end
+        
         root = getRoot(char)
-        if not (char and root) then return end
+        if not root then return end
 
-        local humanoid = char:FindFirstChildWhichIsA("Humanoid")
         local VelocityHandler = root:FindFirstChild(velocityHandlerName)
         local GyroHandler = root:FindFirstChild(gyroHandlerName)
+        if not (VelocityHandler and GyroHandler) then return end
 
-        if not (humanoid and VelocityHandler and GyroHandler) then return end
-
-        local speed = (vfly and vehicleflyspeed or iyflyspeed) * 50
-        local direction = controlModule:GetMoveVector()
-
-        VelocityHandler.MaxForce = v3inf
-        GyroHandler.MaxTorque = v3inf
         GyroHandler.CFrame = camera.CFrame
-
-        if not vfly then humanoid.PlatformStand = true end
-
-        -- Reset and apply directional velocity
-        VelocityHandler.Velocity = camera.CFrame:VectorToWorldSpace(Vector3.new(direction.X, 0, -direction.Z)) * speed
-
-        -- Animation update
-        updateMobileAnimation(char, direction)
+        VelocityHandler.Velocity = (camera.CFrame.LookVector * iyflyspeed) + Vector3.new(0, 0.5, 0)
     end)
 end
 
@@ -258,19 +195,28 @@ Tab:CreateSlider({
     end
 })
 
-local FlyToggle = Tab:CreateToggle({
+FlyToggle = Tab:CreateToggle({
     Name = "Fly",
     CurrentValue = FLYING,
     Callback = function(state)
-        if state then
-            sFLY()
-        else
-            NOFLY()
+        local success, err = pcall(function()
+            if state then
+                sFLY()
+            else
+                NOFLY()
+            end
+        end)
+        
+        if not success then
+            warn("Fly Toggle Error:", err)
+            if FlyToggle then
+                FlyToggle:Set(not state)
+            end
         end
     end,
 })
 
-local FlySpeedSlider = Tab:CreateSlider({
+Tab:CreateSlider({
     Name = "Fly Speed",
     Range = {1, 200},
     Increment = 1,
@@ -281,18 +227,20 @@ local FlySpeedSlider = Tab:CreateSlider({
     end,
 })
 
-local FlyKeybind = Tab:CreateKeybind({
+Tab:CreateKeybind({
     Name = "Toggle Fly",
     CurrentKeybind = "F",
     HoldToInteract = false,
     Callback = function()
         FLYING = not FLYING
+        if FlyToggle then
+            FlyToggle:Set(FLYING)
+        end
         if FLYING then
             sFLY()
         else
             NOFLY()
         end
-        FlyToggle:Set(FLYING)
     end,
 })
 
