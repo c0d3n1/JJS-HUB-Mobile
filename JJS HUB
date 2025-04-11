@@ -1,0 +1,237 @@
+-- // Rayfield UI Setup
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "JJS Hub",
+    Icon = 0,
+    LoadingTitle = "JJS Hub",
+    LoadingSubtitle = "by proguyisreal",
+    Theme = "Default",
+    DisableRayfieldPrompts = false,
+    DisableBuildWarnings = false,
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = nil,
+        FileName = "JJS Hub"
+    },
+    Discord = {
+        Enabled = true,
+        Invite = "fpXzgaxDQ5",
+        RememberJoins = true
+    },
+    KeySystem = true,
+    KeySettings = {
+        Title = "JJS Hub",
+        Subtitle = "Key System",
+        Note = "Real sigmas",
+        FileName = "JJS Key",
+        SaveKey = true,
+        GrabKeyFromSite = true,
+        Key =  {"eye of rah"}
+    }
+})
+
+local mfly1
+local mfly2
+
+local ANIMATIONS = {
+	Forward = 282574440,
+	Backward = 9443517965,
+	Left = 9443520855,
+	Right = 9443521999,
+	Idle = 616158929
+}
+
+local animationTracks = {}
+
+local function stopAllMobileAnims()
+	for _, track in pairs(animationTracks) do
+		if track then
+			pcall(function() track:Stop() end)
+		end
+	end
+	animationTracks = {}
+end
+
+local function playMobileAnim(character, direction)
+	local humanoid = character and character:FindFirstChildWhichIsA("Humanoid")
+	if not humanoid or not direction then return end
+
+	-- Stop all before playing
+	stopAllMobileAnims()
+
+	local anim = Instance.new("Animation")
+	anim.AnimationId = "rbxassetid://"..ANIMATIONS[direction]
+	local track = humanoid:LoadAnimation(anim)
+	track.Priority = Enum.AnimationPriority.Action
+	track.Looped = true
+	track:Play()
+
+	animationTracks[direction] = track
+end
+
+local unmobilefly = function(speaker)
+	pcall(function()
+		FLYING = false
+		stopAllMobileAnims()
+		local root = getRoot(speaker.Character)
+		root:FindFirstChild(velocityHandlerName):Destroy()
+		root:FindFirstChild(gyroHandlerName):Destroy()
+		speaker.Character:FindFirstChildWhichIsA("Humanoid").PlatformStand = false
+		if mfly1 then mfly1:Disconnect() end
+		if mfly2 then mfly2:Disconnect() end
+	end)
+end
+
+local mobilefly = function(speaker, vfly)
+	unmobilefly(speaker)
+	FLYING = true
+
+	local root = getRoot(speaker.Character)
+	local camera = workspace.CurrentCamera
+	local v3zero = Vector3.zero
+	local v3inf = Vector3.new(9e9, 9e9, 9e9)
+
+	local controlModule = require(speaker.PlayerScripts:WaitForChild("PlayerModule"):WaitForChild("ControlModule"))
+
+	local bv = Instance.new("BodyVelocity")
+	bv.Name = velocityHandlerName
+	bv.Parent = root
+	bv.MaxForce = v3zero
+	bv.Velocity = v3zero
+
+	local bg = Instance.new("BodyGyro")
+	bg.Name = gyroHandlerName
+	bg.Parent = root
+	bg.MaxTorque = v3inf
+	bg.P = 1000
+	bg.D = 50
+
+	mfly1 = speaker.CharacterAdded:Connect(function()
+		stopAllMobileAnims()
+	end)
+
+	mfly2 = RunService.RenderStepped:Connect(function()
+		root = getRoot(speaker.Character)
+		camera = workspace.CurrentCamera
+		if speaker.Character:FindFirstChildWhichIsA("Humanoid") and root and root:FindFirstChild(velocityHandlerName) and root:FindFirstChild(gyroHandlerName) then
+			local humanoid = speaker.Character:FindFirstChildWhichIsA("Humanoid")
+			local VelocityHandler = root:FindFirstChild(velocityHandlerName)
+			local GyroHandler = root:FindFirstChild(gyroHandlerName)
+
+			VelocityHandler.MaxForce = v3inf
+			GyroHandler.MaxTorque = v3inf
+			if not vfly then humanoid.PlatformStand = true end
+			GyroHandler.CFrame = camera.CFrame
+			VelocityHandler.Velocity = Vector3.zero
+
+			local direction = controlModule:GetMoveVector()
+			local moveSpeed = (vfly and vehicleflyspeed or iyflyspeed) * 50
+			local activeDirection = nil
+
+			if direction.X ~= 0 then
+				VelocityHandler.Velocity += camera.CFrame.RightVector * direction.X * moveSpeed
+				activeDirection = direction.X > 0 and "Right" or "Left"
+			end
+
+			if direction.Z ~= 0 then
+				VelocityHandler.Velocity -= camera.CFrame.LookVector * direction.Z * moveSpeed
+				activeDirection = direction.Z > 0 and "Forward" or "Backward"
+			end
+
+			if direction.Magnitude < 0.1 then
+				activeDirection = "Idle"
+			end
+
+			playMobileAnim(speaker.Character, activeDirection)
+		end
+	end)
+end
+
+
+
+-- // UI Tabs and Buttons
+local Tab = Window:CreateTab("Blatant", 4483362458)
+local TabMisc = Window:CreateTab("Miscellaneous", 4483362458)
+
+Tab:CreateSection("Movement")
+TabMisc:CreateSection("Scripts")
+
+TabMisc:CreateButton({
+    Name = "Load IY",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+    end
+})
+
+-- // Teleport
+local teleportDistance = 10
+local player = game:GetService("Players").LocalPlayer
+local camera = workspace.CurrentCamera
+
+Tab:CreateKeybind({
+    Name = "Teleport Keybind",
+    CurrentKeybind = "T",
+    HoldToInteract = false,
+    Callback = function()
+        local character = player.Character or player.CharacterAdded:Wait()
+        local rootPart = character:FindFirstChild("HumanoidRootPart")
+        if rootPart and camera then
+            local dir = camera.CFrame.LookVector
+            local moveDir = (dir.Y > 0.1) and dir.Unit or Vector3.new(dir.X, 0, dir.Z).Unit
+            rootPart.CFrame = CFrame.new(rootPart.Position + moveDir * teleportDistance, rootPart.Position + moveDir * 2)
+        end
+    end
+})
+
+Tab:CreateSlider({
+    Name = "Teleport Distance",
+    Range = {1, 100},
+    Increment = 1,
+    Suffix = "Studs",
+    CurrentValue = teleportDistance or 10,
+    Flag = "TeleportSlider",
+    Callback = function(Value)
+        teleportDistance = Value
+    end
+})
+
+local FlyToggle = Tab:CreateToggle({
+    Name = "Fly",
+    CurrentValue = FLYING,
+    Callback = function(state)
+        if state then
+            sFLY()
+        else
+            NOFLY()
+        end
+    end,
+})
+
+local FlySpeedSlider = Tab:CreateSlider({
+    Name = "Fly Speed",
+    Range = {1, 200},
+    Increment = 1,
+    Suffix = "speed",
+    CurrentValue = iyflyspeed,
+    Callback = function(value)
+        iyflyspeed = value
+    end,
+})
+
+local FlyKeybind = Tab:CreateKeybind({
+    Name = "Toggle Fly",
+    CurrentKeybind = "F",
+    HoldToInteract = false,
+    Callback = function()
+        FLYING = not FLYING
+        if FLYING then
+            sFLY()
+        else
+            NOFLY()
+        end
+        FlyToggle:Set(FLYING)
+    end,
+})
+-- // Load Saved Rayfield Config AFTER setup
+Rayfield:LoadConfiguration()
