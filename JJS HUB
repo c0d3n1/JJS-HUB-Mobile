@@ -1,5 +1,19 @@
--- // Rayfield UI Setup
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+-- Define missing variables/functions at the top
+local IsOnMobile = game:GetService("UserInputService").TouchEnabled
+
+local function NOFLY()
+    if FLYING then
+        unmobilefly(game:GetService("Players").LocalPlayer)
+    end
+end
+
+local function sFLY()
+    if not FLYING then
+        mobilefly(game:GetService("Players").LocalPlayer)
+    end
+end
 
 local Window = Rayfield:CreateWindow({
     Name = "JJS Hub",
@@ -27,7 +41,7 @@ local Window = Rayfield:CreateWindow({
         FileName = "JJS Key",
         SaveKey = true,
         GrabKeyFromSite = true,
-        Key =  {"eye of rah"}
+        Key = {"eye of rah"}
     }
 })
 
@@ -198,31 +212,6 @@ local function mobilefly(speaker, vfly)
     end)
 end
 
--- Example usage with command handlers
-addcmd("fly", {}, function(args, speaker)
-    if not IsOnMobile then
-        NOFLY()
-        task.wait()
-        sFLY()
-    else
-        mobilefly(speaker)
-    end
-    if args[1] and isNumber(args[1]) then
-        iyflyspeed = tonumber(args[1])
-    end
-end)
-
-addcmd("unfly", {}, function(args, speaker)
-    if not IsOnMobile then
-        NOFLY()
-    else
-        unmobilefly(speaker)
-    end
-end)
-
-
-
-
 -- // UI Tabs and Buttons
 local Tab = Window:CreateTab("Blatant", 4483362458)
 local TabMisc = Window:CreateTab("Miscellaneous", 4483362458)
@@ -306,5 +295,6 @@ local FlyKeybind = Tab:CreateKeybind({
         FlyToggle:Set(FLYING)
     end,
 })
+
 -- // Load Saved Rayfield Config AFTER setup
 Rayfield:LoadConfiguration()
