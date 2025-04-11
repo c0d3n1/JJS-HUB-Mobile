@@ -30,6 +30,13 @@ local Window = Rayfield:CreateWindow({
     }
 })
 
+-- Animation IDs
+local ANIMATIONS = {
+    Fly = 616158929,       -- Replace with your fly animation ID
+    Idle = 2510233257,     -- Replace with idle animation ID
+    Run = 125750702        -- Replace with run animation ID
+}
+
 local IsOnMobile = game:GetService("UserInputService").TouchEnabled
 local player = game:GetService("Players").LocalPlayer
 
@@ -40,6 +47,8 @@ local velocityHandlerName = "MobileVelocity"
 local gyroHandlerName = "MobileGyro"
 local iyflyspeed = 50
 local vehicleflyspeed = 50
+local currentAnim = nil
+local animator = nil
 
 -- Store toggle reference globally
 local FlyToggle = nil
@@ -55,6 +64,28 @@ local function safeDisconnect(conn)
         conn = nil
     end
     return conn
+end
+
+-- Animation control
+local function playAnimation(animName)
+    if not player.Character then return end
+    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+    
+    -- Stop current animation
+    if currentAnim then
+        currentAnim:Stop()
+        currentAnim = nil
+    end
+    
+    -- Load and play new animation
+    if ANIMATIONS[animName] then
+        local anim = Instance.new("Animation")
+        anim.AnimationId = "rbxassetid://"..ANIMATIONS[animName]
+        currentAnim = humanoid:LoadAnimation(anim)
+        currentAnim:Play()
+        currentAnim.Looped = true
+    end
 end
 
 -- Stop flying function
@@ -73,7 +104,10 @@ local function NOFLY()
         end
 
         local hum = char:FindFirstChildWhichIsA("Humanoid")
-        if hum then hum.PlatformStand = false end
+        if hum then 
+            hum.PlatformStand = false
+            playAnimation("Idle") -- Return to idle when not flying
+        end
     end
 
     mfly1 = safeDisconnect(mfly1)
@@ -93,6 +127,9 @@ local function sFLY()
     
     local camera = workspace.CurrentCamera
     local v3inf = Vector3.new(9e9, 9e9, 9e9)
+    
+    -- Play fly animation
+    playAnimation("Fly")
     
     -- Create velocity + gyro
     local bv = Instance.new("BodyVelocity")
@@ -116,6 +153,7 @@ local function sFLY()
         local newRoot = getRoot(newChar)
         if not newRoot then return end
 
+        -- Recreate velocity and gyro
         local newBV = newRoot:FindFirstChild(velocityHandlerName) or Instance.new("BodyVelocity")
         newBV.Name = velocityHandlerName
         newBV.MaxForce = v3inf
@@ -128,6 +166,9 @@ local function sFLY()
         newBG.P = 1000
         newBG.D = 50
         newBG.Parent = newRoot
+        
+        -- Replay animation
+        playAnimation("Fly")
     end)
 
     -- Update each frame
@@ -149,7 +190,7 @@ local function sFLY()
     end)
 end
 
--- // UI Tabs and Buttons
+-- UI Setup
 local Tab = Window:CreateTab("Blatant", 4483362458)
 local TabMisc = Window:CreateTab("Miscellaneous", 4483362458)
 
@@ -163,9 +204,8 @@ TabMisc:CreateButton({
     end
 })
 
--- // Teleport
+-- Teleport System
 local teleportDistance = 10
-local player = game:GetService("Players").LocalPlayer
 local camera = workspace.CurrentCamera
 
 Tab:CreateKeybind({
@@ -195,6 +235,7 @@ Tab:CreateSlider({
     end
 })
 
+-- Fly System UI
 FlyToggle = Tab:CreateToggle({
     Name = "Fly",
     CurrentValue = FLYING,
@@ -244,5 +285,5 @@ Tab:CreateKeybind({
     end,
 })
 
--- // Load Saved Rayfield Config AFTER setup
+-- Load configuration
 Rayfield:LoadConfiguration()
